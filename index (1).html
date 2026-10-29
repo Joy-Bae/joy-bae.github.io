@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="동영상 추천 시스템 실습 프로젝트 포트폴리오: 콘텐츠 기반, 협업 필터링, 행렬 분해(WALS), 투 타워 신경망, 3단계 서빙 파이프라인 비교">
+<title>동영상 추천 시스템 스튜디오</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+img { max-width: 100%; }
+
+/* Layout: dark "player" hero band with a watch-progress timeline, sticky tab bar, one panel per tab on a cool neutral plane. */
+:root {
+  --bg: #f4f5f8;
+  --surface: #fcfcfd;
+  --surface-2: #eceef3;
+  --ink: #131820;
+  --ink-2: #474f5e;
+  --muted: #6f7787;
+  --line: #dde1e8;
+  --axis: #c3c8d2;
+  --grid: #e6e9ef;
+  --s1: #2a78d6;
+  --s1-soft: #cde2fb;
+  --s2: #eb6834;
+  --zero: #b9c2d0;
+  --accent-ink: #1c5cab;
+  --hero-bg: #0e1626;
+  --hero-ink: #eef2f8;
+  --hero-ink-2: #a9b5c8;
+  --hero-track: #2a3550;
+  --code-bg: #121927;
+  --code-fg: #e3e8f1;
+  --code-cm: #8fa0bb;
+  --good: #0a7d0a;
+  --good-bg: #e3f4e3;
+  --warn: #8a5a00;
+  --warn-bg: #fbefd2;
+  --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1116; --surface: #181b22; --surface-2: #20242d; --ink: #eceef2; --ink-2: #b4bac6; --muted: #8b92a0;
+    --line: #2b303a; --axis: #3a404c; --grid: #262a33; --s1: #3987e5; --s1-soft: #1d3556; --s2: #d95926; --zero: #2c3340;
+    --accent-ink: #86b6ef; --hero-bg: #0a0f1a; --hero-ink: #eef2f8; --hero-ink-2: #a9b5c8; --hero-track: #26304a;
+    --code-bg: #0b0f18; --code-fg: #e3e8f1; --code-cm: #8796b0; --good: #3cc13c; --good-bg: #13301a; --warn: #f0b544; --warn-bg: #3a2c0d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1116; --surface: #181b22; --surface-2: #20242d; --ink: #eceef2; --ink-2: #b4bac6; --muted: #8b92a0;
+  --line: #2b303a; --axis: #3a404c; --grid: #262a33; --s1: #3987e5; --s1-soft: #1d3556; --s2: #d95926; --zero: #2c3340;
+  --accent-ink: #86b6ef; --hero-bg: #0a0f1a; --hero-ink: #eef2f8; --hero-ink-2: #a9b5c8; --hero-track: #26304a;
+  --code-bg: #0b0f18; --code-fg: #e3e8f1; --code-cm: #8796b0; --good: #3cc13c; --good-bg: #13301a; --warn: #f0b544; --warn-bg: #3a2c0d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 1.65; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+p { margin: 0; }
+a { color: var(--accent-ink); }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 4px; }
+.num, .mono { font-family: var(--font-mono); }
+.tab-num { font-variant-numeric: tabular-nums; }
+
+/* hero */
+.hero { background: var(--hero-bg); color: var(--hero-ink); }
+.hero .wrap { padding-block: 44px 36px; display: flex; flex-direction: column; gap: 18px; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.badge { font-size: 12.5px; font-weight: 500; letter-spacing: .02em; padding: 4px 10px; border-radius: 999px; border: 1px solid #34405a; color: var(--hero-ink-2); }
+.badge b { color: var(--hero-ink); font-weight: 600; }
+.eyebrow { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: #8fb8f0; font-weight: 600; }
+.hero h1 { font-size: clamp(28px, 4.4vw, 44px); font-weight: 700; letter-spacing: -0.01em; max-width: 820px; word-break: keep-all; }
+.sec-head h2, .finding h3, .q h3 { word-break: keep-all; }
+.hero .lede { color: var(--hero-ink-2); font-size: 16.5px; max-width: 68ch; }
+.hero-stats { display: grid; gap: 14px 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); max-width: 980px; margin-top: 4px; }
+.hs { display: flex; flex-direction: column; gap: 4px; border-left: 2px solid #2a78d6; padding-left: 14px; min-width: 0; }
+.hs-v { font-family: var(--font-mono); font-size: 26px; font-weight: 600; color: var(--hero-ink); letter-spacing: -0.02em; line-height: 1.2; }
+.hs-l { font-size: 13px; color: var(--hero-ink-2); line-height: 1.5; }
+.hero .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13.5px; color: var(--hero-ink-2); }
+.hero .meta a { color: #9cc4f5; }
+.timeline { margin-top: 6px; display: flex; flex-direction: column; gap: 8px; max-width: 760px; }
+.track { position: relative; height: 8px; border-radius: 4px; background: var(--hero-track); }
+.track .watched { position: absolute; inset: 0 auto 0 0; width: 72%; border-radius: 4px; background: linear-gradient(90deg, #2a78d6, #4c95ea); }
+.track .mark { position: absolute; top: -6px; bottom: -6px; width: 2px; left: 50%; background: #eb6834; }
+.track .head { position: absolute; top: 50%; left: 72%; width: 16px; height: 16px; border-radius: 50%; background: #eef2f8; transform: translate(-50%, -50%); box-shadow: 0 0 0 4px rgba(42,120,214,.35); }
+.timeline .tl-labels { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--hero-ink-2); font-family: var(--font-mono); }
+.timeline .tl-note { font-size: 13.5px; color: var(--hero-ink-2); }
+.timeline .tl-note b { color: #f3a27c; font-weight: 600; }
+
+/* tabs */
+.tabbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; font: inherit; font-size: 14.5px; font-weight: 500; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 14px 12px 12px; cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--s1); font-weight: 600; }
+.tab .tn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-right: 6px; }
+
+main .wrap { padding-block: 32px 56px; }
+.panel { display: flex; flex-direction: column; gap: 28px; }
+.sec-head { display: flex; flex-direction: column; gap: 6px; max-width: 72ch; }
+.sec-head h2 { font-size: 24px; font-weight: 700; }
+.sec-head p { color: var(--ink-2); }
+h3 { font-size: 17px; font-weight: 600; }
+.label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+.grid-4 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.grid-2 { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
+.grid-2 > *, .grid-4 > * { min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.kpi .v { font-family: var(--font-mono); font-size: 30px; font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; }
+.kpi .v small { font-size: 15px; color: var(--muted); font-weight: 500; margin-left: 4px; letter-spacing: 0; }
+.kpi .d { font-size: 13.5px; color: var(--ink-2); }
+.kpi .d b { color: var(--ink); font-weight: 600; }
+
+.chart-card h3 { font-size: 16px; }
+.chart-card .sub { font-size: 13px; color: var(--muted); margin-top: -4px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; line-height: 1.45; padding: 7px 10px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); opacity: 0; transition: opacity .12s; z-index: 3; }
+.tip.on { opacity: 1; }
+.tip b { font-weight: 600; }
+.chart-note { font-size: 13px; color: var(--ink-2); }
+
+.findings { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.finding { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.finding .tag { align-self: flex-start; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--s1-soft); color: var(--accent-ink); }
+.finding p { color: var(--ink-2); font-size: 14.5px; }
+.finding .action { color: var(--ink); font-size: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.finding .action b { font-weight: 600; }
+
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--surface-2); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+@media (max-width: 520px) { td:first-child { white-space: normal; min-width: 7em; } }
+td.n, th.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.best td { background: color-mix(in srgb, var(--s1) 9%, transparent); }
+tr.best td:first-child { font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.ok { background: var(--good-bg); color: var(--good); }
+.chip.lim { background: var(--warn-bg); color: var(--warn); }
+.chip svg { width: 11px; height: 11px; }
+
+/* pipeline */
+.flow { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); align-items: stretch; }
+.stage { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stage .k { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.stage h3 { font-size: 15px; }
+.stage p { font-size: 13px; color: var(--ink-2); }
+.stage .count { margin-top: auto; font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--accent-ink); }
+.stage.serve { border-color: color-mix(in srgb, var(--s1) 45%, var(--line)); }
+.flow-legend { font-size: 13px; color: var(--muted); }
+
+.schema { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
+.entity { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; min-width: 0; }
+.entity header { padding: 10px 14px; background: var(--surface-2); display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.entity header b { font-family: var(--font-mono); font-size: 13.5px; font-weight: 600; }
+.entity header span { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.entity ul { list-style: none; margin: 0; padding: 6px 0; }
+.entity li { display: grid; grid-template-columns: 30px 1fr auto; gap: 6px; padding: 5px 14px; font-size: 13px; align-items: baseline; }
+.entity li .key { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; color: var(--s2); }
+.entity li code { font-family: var(--font-mono); font-size: 12.5px; }
+.entity li .ty { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.entity li.hidden-col code { text-decoration: line-through; color: var(--muted); }
+.entity .foot { padding: 8px 14px 12px; font-size: 12.5px; color: var(--ink-2); border-top: 1px solid var(--line); }
+
+.towers { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+.tower { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; background: var(--surface-2); min-width: 0; }
+.tower .ly { font-family: var(--font-mono); font-size: 12.5px; padding: 6px 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); text-align: center; }
+.tower .ly.out { border-color: var(--s1); color: var(--accent-ink); font-weight: 600; }
+.tower .t { font-size: 13px; font-weight: 600; text-align: center; }
+.merge { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.merge .ly { font-family: var(--font-mono); font-size: 12.5px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); }
+.merge .ly.acc { background: var(--s1); color: #fff; border-color: var(--s1); }
+.arrow-down { width: 2px; height: 14px; background: var(--axis); }
+
+/* lab */
+.lab { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.lab > header { padding: 18px 20px 14px; display: flex; flex-direction: column; gap: 6px; }
+.lab > header .k { font-family: var(--font-mono); font-size: 12px; color: var(--accent-ink); font-weight: 600; letter-spacing: .04em; }
+.lab > header p { color: var(--ink-2); max-width: 75ch; }
+.lab-body { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); border-top: 1px solid var(--line); }
+@media (max-width: 860px) { .lab-body { grid-template-columns: minmax(0, 1fr); } }
+.code { position: relative; background: var(--code-bg); color: var(--code-fg); min-width: 0; }
+.code pre { margin: 0; padding: 12px 18px 18px; overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; tab-size: 4; max-height: 440px; }
+.code .cm { color: var(--code-cm); }
+.code-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px 0 18px; }
+.copy { font: inherit; font-size: 12px; font-weight: 500; color: var(--code-fg); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.copy:hover { background: rgba(255,255,255,.16); }
+.code .src { font-size: 11.5px; color: var(--code-cm); font-family: var(--font-mono); }
+.result { padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.result .tbl-wrap { border-radius: 8px; }
+.result table { font-size: 13px; }
+.result th, .result td { padding: 7px 10px; }
+.out { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; color: var(--ink-2); }
+.take { font-size: 14px; color: var(--ink); }
+.take b { font-weight: 600; }
+
+/* data */
+.heat-wrap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.heat-y { display: grid; font-size: 11.5px; color: var(--muted); text-align: right; }
+.heat-y span { display: flex; align-items: center; justify-content: flex-end; border-bottom: 1px dashed transparent; }
+.heat-x { display: grid; font-size: 11.5px; color: var(--muted); text-align: center; margin-left: 0; }
+canvas { display: block; width: 100%; border-radius: 4px; }
+
+/* interview */
+.qa { display: flex; flex-direction: column; gap: 12px; }
+.q { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; }
+.q .qn { grid-row: span 2; font-family: var(--font-mono); font-weight: 600; font-size: 14px; color: var(--accent-ink); padding-top: 2px; }
+.q h3 { font-size: 16.5px; }
+.q p { color: var(--ink-2); }
+.q p b { color: var(--ink); font-weight: 600; }
+
+footer { border-top: 1px solid var(--line); background: var(--surface); }
+footer .wrap { padding-block: 24px 32px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
+footer b { color: var(--ink-2); font-weight: 600; }
+
+@media (max-width: 520px) {
+  .towers { grid-template-columns: 1fr; }
+  .q { grid-template-columns: 1fr; }
+  .q .qn { grid-row: auto; }
+  .kpi .v { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="badges">
+      <span class="badge"><b>합성 로그</b> 18,000건</span>
+      <span class="badge"><b>추천 방식</b> 5종 + 서빙 파이프라인</span>
+      <span class="badge"><b>평가</b> P@10 · mAP@10 · 다양성</span>
+      <span class="badge"><b>스택</b> Python · scikit-learn · Keras</span>
+    </div>
+    <p class="eyebrow">DA 전문가 양성과정 · 개인 포트폴리오 프로젝트</p>
+    <h1>동영상 추천 시스템, 후보 생성부터 재순위까지</h1>
+    <p class="lede">ByteByteGo 「Video Recommendation System」 설계를 사용자 300명, 영상 100개 규모로 직접 재현했습니다. 인기순 기준선부터 투 타워 신경망까지 다섯 가지 방식을 같은 지표로 채점하고, 3단계 서빙 파이프라인과 콜드 스타트 대응까지 구현했습니다.</p>
+    <div class="hero-stats" aria-label="핵심 결과">
+      <div class="hs"><span class="hs-v">0.259</span><span class="hs-l">P@10 · 투 타워<br>인기순 기준선의 3.1배</span></div>
+      <div class="hs"><span class="hs-v">−0.005</span><span class="hs-l">후보를 최대 40개로 줄였을 때<br>P@10 변화</span></div>
+      <div class="hs"><span class="hs-v">0.449 → 0.218</span><span class="hs-l">재순위 후 목록 평균 유사도<br>(낮을수록 다양)</span></div>
+      <div class="hs"><span class="hs-v">26.1%</span><span class="hs-l">관련성 라벨 비율<br>좋아요만 쓰면 7.9%</span></div>
+    </div>
+    <div class="meta">
+      <span>실행 환경: CPU, 전체 실행 약 1분</span>
+      <span>데이터: 시청 로그를 흉내 낸 합성 데이터</span>
+      <a href="https://drive.google.com/file/d/1SOur5RGA4RFRPhIpQ1qSJT2HRNw7HynS/view?usp=sharing" target="_blank" rel="noopener">노트북 원본 열기 ↗</a>
+    </div>
+    <div class="timeline" aria-label="관련성 라벨 기준을 나타낸 시청 진행 막대">
+      <div class="track"><div class="watched"></div><div class="mark"></div><div class="head"></div></div>
+      <div class="tl-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+      <p class="tl-note">이 프로젝트의 정답 기준: <b>절반 이상 시청했거나 좋아요를 누르면</b> 관련 있는 영상으로 봅니다.</p>
+    </div>
+  </div>
+</header>
+
+<nav class="tabbar" aria-label="섹션">
+  <div class="wrap">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-summary" aria-controls="p-summary" data-view="summary"><span class="tn">01</span>성과 요약</button>
+      <button class="tab" role="tab" id="tab-design" aria-controls="p-design" data-view="design"><span class="tn">02</span>시스템 설계</button>
+      <button class="tab" role="tab" id="tab-lab" aria-controls="p-lab" data-view="lab"><span class="tn">03</span>모델 실험실</button>
+      <button class="tab" role="tab" id="tab-data" aria-controls="p-data" data-view="data"><span class="tn">04</span>데이터 진단</button>
+      <button class="tab" role="tab" id="tab-interview" aria-controls="p-interview" data-view="interview"><span class="tn">05</span>면접 대비</button>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <div class="wrap">
+
+    <!-- 01 summary -->
+    <section class="panel" id="p-summary" role="tabpanel" aria-labelledby="tab-summary">
+      <div class="sec-head">
+        <h2>투 타워가 가장 정확했고, 재순위는 목록 유사도를 절반으로 낮췄습니다</h2>
+        <p>모든 방식을 같은 테스트 정답(사용자별 관련 영상의 30%, 1,388건)으로 채점했습니다. 이미 본 영상은 추천에서 제외했습니다.</p>
+      </div>
+      <div class="grid-4">
+        <div class="card kpi"><span class="label">최고 정확도 · 투 타워</span><span class="v">0.259<small>P@10</small></span><span class="d">인기순 기준선 0.083의 <b>3.1배</b></span></div>
+        <div class="card kpi"><span class="label">관련성 라벨 비율</span><span class="v">26.1<small>%</small></span><span class="d">좋아요만 쓰면 7.9%. 시청 비율을 더해 <b>학습 신호 3.3배</b></span></div>
+        <div class="card kpi"><span class="label">피드백 행렬 밀도</span><span class="v">15.6<small>%</small></span><span class="d">300 × 100칸 중 <b>84%가 빈칸</b>. 가중 손실이 필요한 이유</span></div>
+        <div class="card kpi"><span class="label">2단계 서빙</span><span class="v">0.254<small>P@10</small></span><span class="d">후보를 최대 40개로 줄여도 투 타워 단독 대비 <b>−0.005</b></span></div>
+      </div>
+      <div class="grid-2">
+        <div class="card chart-card">
+          <h3>방식별 정확도</h3>
+          <p class="sub">상위 10개 추천 기준, 높을수록 좋음</p>
+          <div class="legend"><span><i style="background:var(--s1)"></i>P@10</span><span><i style="background:var(--s2)"></i>mAP@10</span></div>
+          <div class="chart" id="chart-acc"></div>
+        </div>
+        <div class="card chart-card">
+          <h3>정확도와 다양성의 균형</h3>
+          <p class="sub">세로축은 추천 목록 안 영상끼리의 평균 유사도. 아래로 갈수록 다양함</p>
+          <div class="chart" id="chart-trade"></div>
+          <p class="chart-note">점선 화살표는 재순위(주제당 최대 4개) 적용 전후입니다. 평균 유사도가 0.449에서 0.218로 낮아진 대신 P@10이 0.254에서 0.186으로 떨어졌습니다.</p>
+        </div>
+      </div>
+      <div class="sec-head"><h2>핵심 발견과 제안</h2></div>
+      <div class="findings">
+        <div class="finding"><span class="tag">정확도</span><h3>피처를 함께 쓰는 투 타워가 1위</h3><p>P@10 0.259, mAP@10 0.272로 행렬 분해(0.225)와 아이템 기반 CF(0.232)를 앞섰습니다. 사용자 인구통계와 영상 메타데이터를 함께 학습한 효과입니다.</p><p class="action"><b>제안</b> 점수 매기기 단계에는 피처 기반 모델을 씁니다.</p></div>
+        <div class="finding"><span class="tag">효율</span><h3>후보를 줄여도 정확도는 거의 그대로</h3><p>행렬 분해 상위 30개와 인기 상위 10개만 후보로 남겨도 P@10은 0.259에서 0.254로 0.005 낮아졌습니다.</p><p class="action"><b>제안</b> 가벼운 후보 생성과 무거운 점수 모델을 나누는 2단계 구조를 씁니다.</p></div>
+        <div class="finding"><span class="tag">다양성</span><h3>정확도 1위는 목록이 한쪽으로 쏠림</h3><p>투 타워의 평균 유사도는 0.451로 높습니다. 파이프라인에 주제당 최대 4개 규칙을 넣으면 0.449에서 0.218로 낮아지지만, P@10도 0.254에서 0.186으로 떨어집니다.</p><p class="action"><b>제안</b> 다양성은 정확도와 함께 보고, 재순위 강도는 온라인 실험으로 정합니다.</p></div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>설계 결정</th><th>실험에서 확인한 근거</th><th>확인 위치</th></tr></thead>
+          <tbody>
+            <tr><td>하이브리드 필터링</td><td>콘텐츠 기반은 새 영상을, 협업 필터링은 새 관심사를 찾습니다. 서로 못 하는 것을 합니다.</td><td>실험실 1</td></tr>
+            <tr><td>관련성 = 좋아요 + 시청 비율</td><td>좋아요만으로는 라벨이 7.9%로 너무 희소합니다.</td><td>실험실 2 · 데이터 진단</td></tr>
+            <tr><td>가중 손실 (빈칸 가중치 0.1)</td><td>관찰된 칸만 쓰면 예측이 모두 1로 퇴화하고, 모든 칸을 같게 쓰면 0으로 쏠립니다.</td><td>실험실 3</td></tr>
+            <tr><td>후보 생성은 가볍게, 점수는 정확하게</td><td>후보를 줄여도 정확도 손실이 0.005에 그칩니다.</td><td>실험실 5</td></tr>
+            <tr><td>다양성은 다른 지표와 함께</td><td>재순위로 다양성은 좋아지지만 정확도가 떨어집니다.</td><td>실험실 5</td></tr>
+            <tr><td>콜드 스타트는 피처 기반 투 타워로</td><td>기록 없는 사용자와 영상도 임베딩을 만들 수 있습니다.</td><td>실험실 6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 02 design -->
+    <section class="panel" id="p-design" role="tabpanel" aria-labelledby="tab-design" hidden>
+      <div class="sec-head">
+        <h2>로그에서 추천 10개까지, 데이터와 서빙을 한 흐름으로 설계했습니다</h2>
+        <p>왼쪽 세 단계는 학습 데이터를 만들고, 오른쪽 세 단계는 요청이 들어올 때마다 실행되는 서빙 파이프라인입니다.</p>
+      </div>
+      <div class="flow">
+        <div class="stage"><span class="k">데이터 1</span><h3>상호작용 로그</h3><p>사용자당 60개 노출, 시청 비율과 좋아요 기록</p><span class="count">18,000행</span></div>
+        <div class="stage"><span class="k">데이터 2</span><h3>관련성 라벨</h3><p>좋아요 또는 시청 50% 이상이면 1</p><span class="count">4,691건 = 26.1%</span></div>
+        <div class="stage"><span class="k">데이터 3</span><h3>피드백 행렬</h3><p>사용자 × 영상, 관련 영상의 30%를 테스트로 숨김</p><span class="count">300 × 100</span></div>
+        <div class="stage serve"><span class="k">서빙 1</span><h3>후보 생성</h3><p>행렬 분해 상위 30 + 인기 상위 10, 본 영상 제외</p><span class="count">100 → 최대 40</span></div>
+        <div class="stage serve"><span class="k">서빙 2</span><h3>점수 매기기</h3><p>투 타워 점수(사용자·영상 임베딩 내적)로 정렬</p><span class="count">최대 40개 정렬</span></div>
+        <div class="stage serve"><span class="k">서빙 3</span><h3>재순위</h3><p>한 주제는 최대 4개까지만</p><span class="count">최종 10개</span></div>
+      </div>
+      <div class="sec-head"><h2>데이터 구조</h2><p>원문 표 6.2~6.4의 구조를 그대로 따른 세 테이블과, 모델 입력으로 만든 피처 행렬입니다.</p></div>
+      <div class="schema">
+        <div class="entity"><header><b>VIDEOS</b><span>100행</span></header><ul>
+          <li><span class="key">PK</span><code>video_id</code><span class="ty">INT</span></li>
+          <li><span class="key"></span><code>topic</code><span class="ty">5종</span></li>
+          <li><span class="key"></span><code>tags</code><span class="ty">주제 + 세부 태그</span></li>
+          <li><span class="key"></span><code>language</code><span class="ty">ko · en</span></li>
+          <li><span class="key"></span><code>duration</code><span class="ty">분</span></li>
+        </ul><p class="foot">주제: 요리 18 · 여행 15 · 게임 22 · 음악 26 · 코딩 19</p></div>
+        <div class="entity"><header><b>USERS</b><span>300행</span></header><ul>
+          <li><span class="key">PK</span><code>user_id</code><span class="ty">INT</span></li>
+          <li><span class="key"></span><code>age</code><span class="ty">13–59</span></li>
+          <li><span class="key"></span><code>language</code><span class="ty">ko · en</span></li>
+          <li><span class="key"></span><code>device</code><span class="ty">mobile · pc</span></li>
+          <li class="hidden-col"><span class="key"></span><code>fav</code><span class="ty">숨은 정답</span></li>
+        </ul><p class="foot"><code class="mono">fav</code>(진짜 취향)는 검증에만 쓰고 모델 입력에서는 뺐습니다.</p></div>
+        <div class="entity"><header><b>INTERACTION_LOG</b><span>18,000행</span></header><ul>
+          <li><span class="key">FK</span><code>user_id</code><span class="ty">INT</span></li>
+          <li><span class="key">FK</span><code>video_id</code><span class="ty">INT</span></li>
+          <li><span class="key"></span><code>watch_frac</code><span class="ty">0–1</span></li>
+          <li><span class="key"></span><code>like</code><span class="ty">0 · 1</span></li>
+          <li><span class="key"></span><code>label</code><span class="ty">파생</span></li>
+        </ul><p class="foot"><code class="mono">label</code> = 좋아요 또는 시청 50% 이상</p></div>
+        <div class="entity"><header><b>FEATURES</b><span>모델 입력</span></header><ul>
+          <li><span class="key"></span><code>video_feat</code><span class="ty">100 × 22</span></li>
+          <li><span class="key"></span><code>· 태그</code><span class="ty">19</span></li>
+          <li><span class="key"></span><code>· 언어 + 길이</code><span class="ty">2 + 1</span></li>
+          <li><span class="key"></span><code>user_feat</code><span class="ty">300 × 27</span></li>
+          <li><span class="key"></span><code>· 인구통계 + 이력</code><span class="ty">8 + 19</span></li>
+        </ul><p class="foot">시청 이력은 본 영상들의 태그 벡터 평균으로 고정 길이로 바꿨습니다.</p></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>투 타워 신경망 구조</h3>
+          <p class="chart-note">두 타워가 같은 16차원 공간에 임베딩을 만들고, 내적에 시그모이드를 씌워 관련 확률을 예측합니다. 학습 후 영상 임베딩은 미리 계산해 두고 사용자 임베딩만 요청 때 계산합니다.</p>
+          <div class="towers">
+            <div class="tower"><span class="t">사용자 타워</span><span class="ly">입력 27</span><span class="ly">Dense 32 · ReLU</span><span class="ly out">임베딩 16</span></div>
+            <div class="tower"><span class="t">영상 타워</span><span class="ly">입력 22</span><span class="ly">Dense 32 · ReLU</span><span class="ly out">임베딩 16</span></div>
+          </div>
+          <div class="merge"><span class="arrow-down"></span><span class="ly">내적 (Dot)</span><span class="arrow-down"></span><span class="ly acc">시그모이드 → 관련 확률</span></div>
+        </div>
+        <div class="card chart-card">
+          <h3>학습 곡선</h3>
+          <p class="sub">이진 교차 엔트로피, 10 에폭, 배치 256. 검증 AUC 0.984</p>
+          <div class="legend"><span><i style="background:var(--s1)"></i>학습 손실</span><span><i style="background:var(--s2)"></i>검증 손실</span></div>
+          <div class="chart" id="chart-loss"></div>
+          <p class="chart-note">검증 손실이 학습 손실과 함께 내려가 과적합 신호는 보이지 않습니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03 lab -->
+    <section class="panel" id="p-lab" role="tabpanel" aria-labelledby="tab-lab" hidden>
+      <div class="sec-head">
+        <h2>모델 실험실</h2>
+        <p>노트북의 핵심 코드와 실행 결과를 실험 순서대로 정리했습니다. 코드 블록의 복사 버튼으로 그대로 가져갈 수 있습니다.</p>
+      </div>
+      <div id="labs" style="display:flex;flex-direction:column;gap:18px"></div>
+    </section>
+
+    <!-- 04 data -->
+    <section class="panel" id="p-data" role="tabpanel" aria-labelledby="tab-data" hidden>
+      <div class="sec-head">
+        <h2>데이터 진단</h2>
+        <p>실제 YouTube 로그를 흉내 낸 합성 데이터입니다. 사용자마다 모델이 볼 수 없는 숨은 취향이 있고, 취향 주제는 90%, 연관 주제는 60%, 기타 주제는 10% 수준으로 시청하도록 만들었습니다. 같은 언어가 아니면 시청 비율이 절반으로 줄어듭니다.</p>
+      </div>
+      <div class="card chart-card">
+        <h3>학습용 피드백 행렬</h3>
+        <p class="sub">사용자는 숨은 취향, 영상은 주제로 묶어 정렬했습니다. 파란 칸이 관련 있음(1)입니다. 모델은 이 묶음을 모른 채 학습합니다.</p>
+        <div class="chart" id="chart-heat"></div>
+        <p class="chart-note">각 취향 묶음에서 자기 주제와 연관 주제 열이 진하게 채워집니다. 예를 들어 요리 취향은 여행 열도, 게임 취향은 음악 열도 함께 봅니다. 학습 행렬은 테스트 정답을 지운 상태라 밀도가 11.0%입니다.</p>
+      </div>
+      <div class="grid-2">
+        <div class="card chart-card">
+          <h3>시청 비율 분포</h3>
+          <p class="sub">노출 18,000건, 10% 구간별 건수</p>
+          <div class="legend"><span><i style="background:var(--zero)"></i>관련 없음</span><span><i style="background:var(--s1)"></i>관련 있음 (50% 이상)</span></div>
+          <div class="chart" id="chart-hist"></div>
+          <p class="chart-note">33%가 10% 미만 시청입니다. 노출 대부분이 취향과 무관한 영상이기 때문입니다.</p>
+        </div>
+        <div class="card chart-card">
+          <h3>취향 관계별 관련 비율</h3>
+          <p class="sub">노출된 영상이 사용자의 숨은 취향과 어떤 관계인지에 따라</p>
+          <div class="chart" id="chart-group"></div>
+          <p class="chart-note">같은 언어 영상의 관련 비율은 33.6%, 다른 언어는 8.4%입니다. 언어를 피처에 넣은 근거입니다.</p>
+        </div>
+      </div>
+      <div class="sec-head"><h2>데이터 점검 기록</h2></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>발견</th><th>처리</th><th>상태</th></tr></thead>
+          <tbody>
+            <tr><td>명시적 피드백</td><td>좋아요는 노출의 7.9%뿐이라 학습 신호가 부족함</td><td>시청 50% 이상을 함께 관련으로 정의해 26.1%로 확보</td><td><span class="chip ok" data-ic="ok">반영</span></td></tr>
+            <tr><td>라벨 중복</td><td>좋아요는 시청 70% 초과에서만 생겨서 결합 라벨이 시청 50% 기준과 같아짐 (4,691건 일치)</td><td>합성 데이터의 특성으로 기록. 실제 로그에서는 짧게 보고 좋아요를 누르는 경우가 있어 결합이 의미를 가짐</td><td><span class="chip lim" data-ic="lim">한계</span></td></tr>
+            <tr><td>행렬 희소성</td><td>피드백 행렬의 84.4%가 빈칸</td><td>빈칸 가중치 0.1의 가중 손실로 학습</td><td><span class="chip ok" data-ic="ok">반영</span></td></tr>
+            <tr><td>평가 분리</td><td>같은 관련 영상이 학습과 평가에 동시에 쓰일 위험</td><td>사용자별 관련 영상 30%(1,388건)를 학습 행렬에서 지우고 정답으로 사용</td><td><span class="chip ok" data-ic="ok">반영</span></td></tr>
+            <tr><td>이미 본 영상</td><td>학습에 쓴 영상이 추천 목록에 섞이면 점수가 부풀려짐</td><td>모든 방식의 상위 k 추출에서 제외</td><td><span class="chip ok" data-ic="ok">반영</span></td></tr>
+            <tr><td>숨은 취향</td><td><code class="mono">fav</code>를 입력에 넣으면 정답 누수</td><td>모델 입력에서 빼고 결과 검증에만 사용</td><td><span class="chip ok" data-ic="ok">반영</span></td></tr>
+            <tr><td>노출 상한</td><td>사용자당 100개 중 60개만 노출되어, 노출되지 않은 영상은 정답이 될 수 없음</td><td>P@10의 절대값보다 기준선 대비 상대 비교로 해석</td><td><span class="chip lim" data-ic="lim">한계</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 05 interview -->
+    <section class="panel" id="p-interview" role="tabpanel" aria-labelledby="tab-interview" hidden>
+      <div class="sec-head">
+        <h2>면접 대비</h2>
+        <p>이 프로젝트에 대해 받을 만한 질문과, 실험 결과에 근거한 답변입니다.</p>
+      </div>
+      <div class="qa">
+        <div class="q"><span class="qn">Q1</span><h3>P@10이 0.3도 안 되는데, 성능이 낮은 것 아닌가요?</h3><p>사용자마다 영상 100개 중 <b>60개만 노출</b>되어, 노출되지 않은 영상은 좋아할 영상이어도 정답이 될 수 없습니다. 그래서 절대값보다 인기순 기준선 0.083 대비 <b>3.1배</b>라는 상대 비교로 봤습니다.</p></div>
+        <div class="q"><span class="qn">Q2</span><h3>빈칸 가중치를 왜 0.1로 정했나요?</h3><p>세 가지로 비교했습니다. 관찰된 칸만 쓰면(0) 빈칸 평균 예측이 <b>0.799</b>로 거의 모두 1이 되어 P@10이 0.104로 떨어졌습니다. 모든 칸을 같게 쓰면(1) 관찰칸 예측이 0.429로 0쪽으로 쏠렸습니다. 0.1에서 관찰칸 0.856, 빈칸 0.175로 균형이 맞고 P@10도 <b>0.225</b>로 가장 높았습니다.</p></div>
+        <div class="q"><span class="qn">Q3</span><h3>후보 생성과 점수 매기기를 왜 나누나요?</h3><p>실제 서비스는 영상이 수십억 개라 무거운 모델로 전부 채점할 수 없습니다. 이 실험에서도 후보를 최대 40개로 줄였을 때 P@10이 <b>0.259 → 0.254</b>로 거의 같았습니다. 정확도를 크게 잃지 않고 계산량을 줄일 수 있다는 근거입니다.</p></div>
+        <div class="q"><span class="qn">Q4</span><h3>다양성 지표만 보고 판단하면 안 되는 이유는요?</h3><p>인기순 기준선은 평균 유사도 0.231로 꽤 다양해 보이지만 P@10은 0.083으로 가장 낮습니다. 재순위도 다양성을 0.449에서 <b>0.218</b>로 올렸지만 P@10이 0.186으로 떨어졌습니다. 다양성은 정확도와 함께 봐야 하고, 최종 강도는 온라인 실험으로 정하는 것이 맞습니다.</p></div>
+        <div class="q"><span class="qn">Q5</span><h3>신규 사용자나 새 영상은 어떻게 추천하나요?</h3><p>투 타워는 ID가 아니라 피처로 임베딩을 만들어서 기록이 없어도 추천할 수 있습니다. 17세·한국어·모바일 신규 사용자에게는 <b>게임 10개</b>가 추천되었는데, 같은 10대 사용자들이 많이 본 주제입니다. ‘게임 공략’ 새 영상과 가장 잘 맞는 사용자 20명은 숨은 취향이 게임 14명, 음악 6명이었습니다.</p></div>
+        <div class="q"><span class="qn">Q6</span><h3>이 프로젝트의 한계와 다음 단계는요?</h3><p>합성 데이터라 규칙이 단순하고, 좋아요와 시청 기준이 겹치는 등 실제 로그와 다릅니다. 다음 단계로 MovieLens 같은 실제 평점 데이터에 같은 파이프라인을 적용하고, 재순위에 신선도와 중복 제거 규칙을 더해 정확도와 다양성의 균형점을 찾아보려 합니다.</p></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>재현 정보</b> 2026년 10월 30일 재실행. Python 3, scikit-learn 1.9, Keras 3 (JAX 백엔드), 난수 시드 고정.</p>
+    <p>데이터 생성과 행렬 분해 결과는 원본 Colab 실행과 같습니다. 투 타워 수치는 실행 환경에 따라 소수 셋째 자리가 달라질 수 있습니다(원본 Colab 실행: P@10 0.256, mAP@10 0.267, 검증 AUC 0.983).</p>
+    <p><b>참고</b> ByteByteGo 「Video Recommendation System」(머신러닝 시스템 설계 6장)의 설계를 축소 재현한 과정 실습을 바탕으로 했습니다.</p>
+  </div>
+</footer>
+
+<script>
+const D = {"counts":{"videos":100,"users":300,"log":18000,"positives":4691,"test":1388,"rel_rate":0.2606,"like_rate":0.0789,"density":0.1564,"train_density":0.1101,"video_feat":[100,22],"user_feat":[300,27],"pos_per_user_mean":15.64,"val_auc":0.984},"topic_counts":{"요리":18,"여행":15,"게임":22,"음악":26,"코딩":19},"fav_counts":{"요리":75,"여행":72,"게임":24,"음악":23,"코딩":106},"by_group":{"취향 주제":{"n":3323.0,"rel":0.81,"like":0.329,"watch":0.754},"연관 주제":{"n":3544.0,"rel":0.552,"like":0.092,"watch":0.508},"기타 주제":{"n":11133.0,"rel":0.004,"like":0.0,"watch":0.114}},"lang_match_rel":{"False":0.084,"True":0.336},"watch_hist":[5934,2919,2185,1194,1077,1074,834,707,786,1290],"results":[{"모델":"인기순 (기준선)","P@10":0.083,"mAP@10":0.073,"평균 유사도(↓다양)":0.231},{"모델":"콘텐츠 기반","P@10":0.185,"mAP@10":0.166,"평균 유사도(↓다양)":0.566},{"모델":"아이템 기반 CF","P@10":0.232,"mAP@10":0.227,"평균 유사도(↓다양)":0.354},{"모델":"행렬 분해 (WALS)","P@10":0.225,"mAP@10":0.216,"평균 유사도(↓다양)":0.328},{"모델":"투 타워","P@10":0.259,"mAP@10":0.272,"평균 유사도(↓다양)":0.451},{"모델":"파이프라인 (재순위 없음)","P@10":0.254,"mAP@10":0.265,"평균 유사도(↓다양)":0.449},{"모델":"파이프라인 (주제당 최대 4)","P@10":0.186,"mAP@10":0.218,"평균 유사도(↓다양)":0.218}],"w0":[{"모델":"w0=0.0","P@10":0.104,"mAP@10":0.084,"평균 유사도(↓다양)":0.406,"obs":0.999,"unobs":0.799},{"모델":"w0=1.0","P@10":0.22,"mAP@10":0.204,"평균 유사도(↓다양)":0.325,"obs":0.429,"unobs":0.068},{"모델":"w0=0.1","P@10":0.225,"mAP@10":0.216,"평균 유사도(↓다양)":0.328,"obs":0.856,"unobs":0.175}],"auc_curve":[0.817,0.9465,0.9657,0.9724,0.9748,0.9794,0.9809,0.983,0.9834,0.9843],"loss_curve":[0.5146,0.3284,0.2278,0.1926,0.1734,0.1622,0.1551,0.1501,0.1476,0.1459],"val_loss_curve":[0.422,0.2396,0.1957,0.1705,0.1579,0.1442,0.1375,0.132,0.1336,0.1275],"user0":{"age":18,"lang":"ko","fav":"게임","recs":[{"video_id":30,"topic":"게임","tags":"게임 RPG","language":"ko"},{"video_id":75,"topic":"게임","tags":"게임 e스포츠","language":"ko"},{"video_id":56,"topic":"게임","tags":"게임 RPG","language":"ko"},{"video_id":64,"topic":"게임","tags":"게임 RPG","language":"ko"},{"video_id":42,"topic":"음악","tags":"음악 KPOP","language":"ko"},{"video_id":84,"topic":"음악","tags":"음악 기타","language":"ko"},{"video_id":48,"topic":"음악","tags":"음악 기타","language":"ko"},{"video_id":97,"topic":"음악","tags":"음악 기타","language":"ko"},{"video_id":80,"topic":"코딩","tags":"코딩 파이썬","language":"ko"},{"video_id":82,"topic":"요리","tags":"요리 한식","language":"ko"}]},"matrix":{"rows":["0000010010100000110000000000100000000000000000000000000000000000000000000000000000000000000000000000","0000000000000010010000000100000000000000000000000000000000000000000000000000000000000000000000000000","0010000101100101000100000001001000000000000000000000000000000000000000000000000000000000000000000000","0100000000000111000111101001000100000000000000000000000000000000000000000000000010000000000000000000","1000000110001010010011111000000110000000000000000000000000000000000000000000000000000000000000000000","0001100000110000010000000000000000000000000000000000000000000000000000000000001000000000000000000000","0110001100001101010010000000001100000000000000000000000000000000000000000000000000000000000000000000","0000011101000100011000110000010100000000000001000000000000000000000000000000000000000000000000000000","0000110001100000010000000000100000000000000000000000000000000000000000000000000000000000000000000000","1000000000100000100000001010000000000000000000000000000000000000000000000000000000001000000000000000","1000000001011011010100010000101000000000000000000000000000000000000000000000000000000000000000000000","0010000110000111000010000001010000000000000000000000000000000000000000000000000000000000000000000000","0001000011010100010100011000010010000000000000000000000000000000000000000000000000000000000000000000","1100100110010100000000100001100010000000000000000000000000000000000000000000000000000000000000000000","1001000100011100001000011011000000000000000000000000000000000000000000000000000000000000000000000000","0010000111011100010000000001011000000000000000000000000000000000000000000000000000000000000000000000","0000100111010010001001011000110000000000000000000000000000000000000000000000000000000000000000000000","0010000101001100000111110000000000000000000000000000000000000000000000000000000000000000000000000000","1100001001010101110000100000000100000000000000000000000000000000000000000000000000000000000000000000","0111001000000010011000010000001110000000000000000000000000000000000000000000000000000000000000000000","0011100001000110001001001000010000000000000000000010000000000000000000000000000000000000000000000000","0001010001000100010000000100000000000000000000000000000000000000000000000000000000000000000000000000","0100000011000110000010001000100100000000000000000000000000000000000000000000000000000000000000000000","0111001000000101001010010000000100000000000000000000000000000000000000000000000000000000000000000000","0000000111011000000010010000000000000000000000000000000000000000000000000000000000000000000000000000","1010010101010010001010101000100110000000000000000000000000000000000000000100000000000000000000000000","0010001001000010001001110001000110000000000000000000000000000000000000000000000000000000000000000000","0010001100000110101110001000000010000000000000000000000000000000000000000000000000000000000000000000","0010000100101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","0010111110010000100100010001100100000000000000000000000000000000000000000000000000000000000000000000","1010111000011011000001000000110010000000000000000000000000000000000000000000000000000000000000000000","1000001001101010000010010000010110000000000000000000000000000000000000000000000000000000000000000000","0000000000110000100000101000001110000000000000000000000000000000000000000000000000000000000000000000","0100000101100010011001000000101010000000000000000000000000000000000000000000000000000000000000000000","0110000001011101000000000001011000000000000000000000000000000000000000000000000000000000000000000000","0101101001011110011000010001100000000000000000000000000000000000000000000000000000000000000000000000","1100001100000010110011010000010000000000000000000000000000000000000000000000000000000000000000000000","0101000010010001010010000000000010000000000000000000000000000000000000000000000000000000000000000000","0100100001000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000","0010000010000100100000000000000000000000000000000000000000000000000000000000000000000000000000000000","0100000110010101100111000001011100000000000000000000000000000000000000000000000000000000000000000000","0000001110001010010000101000011100000000000000000000000000000000000000000000000000000000000000000000","1100000101000011011010000001000010000000000000000000000000000000000000000000000000000000000000000000","0011001000000100000000011000010100000000000000000000000000000000000000000000000000000000000000000000","1110000110000110000001000000000000000000000000000000000000000000000000000000000000000000000000000000","0001101111000110000000000000100000000000000000000000000000000000000000000000000000000000000000000000","0001000110010010000100100000001010000000000000000000000000000000000000000000000000000000000000000000","1101001100001000000000001001000000000000000000000000000000000000000000000000000000000000000000000000","0011001011011010010000110000000100000000000000001000000000000000000000000000000000000000000000000000","0000000001100000100000000001000000000000000000000000000000000000000000000000000000000000000000000000","0000010000010011000110000000010000000000100000000000000000000000000000000000000000000000000000000000","0100001000000101011000110000011100000000000000000000000000000000000000000000000000000000000000000000","1000001010000001100011000001001000000000000000000000000000000000000000000000000000000000000000000000","0000110010000101100000000100000000000000000000000000000000000000000000000000000000000000000000000000","0110001100010100010001000000000000000000000000000000000000000000000000000000000000000000000000000000","1000100011000100001000100000101000000000000000000000000000000000000000000000000000000000000000000000","0110000010001000000000101000011000000000000000000000000000000000000000000000000000000000000000000000","0010000111001000000010001001001110000000000000000000000000000000000000000000000000000000000000000000","0001001110000001000100000101100000000000000000000000000000000000000000000000000000000000000000000000","1110010101100111000010011000000000000000000000000000000000000000000000000000000000000000000000000000","0000001100010000100011011001000100000000000000000000000000000000000000000000000000000000000000000000","1100000100011110000100011000011100000000000000000000000000000000000000000000000000000000000000000000","0001100000010100000000011001101110000000000000000000000000000000000000000000000000000000000000000000","1000010000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000","0100001100110010001000100000100100000000000000000000000000000000000000000000000000000000000000000000","1000000101000010000100110001000000000000000000000000000000000000000000000000000000000000000000000000","1101000101011001001001100011000000000000000000000000000000000000000000000000000000000000000000000000","1011001100010011001000000000001010000000000000000000000000000000000000000000000000000000000000000000","0000000100001110011100100001101000000000000000000000000000000000000000000000000000000000000000000000","0100000101001100000011101001110010000000000000000000000000000000000000000000000000000000000000000000","0100111000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","0100100010100010100100000000000000000000000000000000000000000000000000000000000000000000000000000000","1011000101001110110010000000100010000000000000000000000000000000000000000000000000000000000000000000","0000010111000111001100010000000100000000000000000000000000000000000000000000000000000000000000000000","1000000111000100001000011000101000000000000000000000000000000000000000000000000000000000000000000000","0110001001010011000010000000001010000000000000000000000000000000000000000000000000000000000000000000","0110000100000111000111001100001000000000000000000000000000000000000000000000000000000000000000000000","0000000101000000010001100000101100000000000000000000000000000000000000000000000000000000000000000000","1000000100001101000001000000110010000000000000000000000000000000000000000000000000000000000000000000","1000001011011000001000101000010100000000000000000000000000000000000000000000000000000000000000000000","1110000010000011001110000000110000000000000000000000000000000000000000000000000000000000000000000000","0001000010000100010101001000001100000000000000000000000000000000000000000000000000000000000000000000","0000100000100000100100000000001000000000000000000000000000000000000000000000000000000000000000000000","0010000101000110000101101000010110000000000000000000000000000000000000000000000000000000000000000000","0010000001000010000011100001001100000000000000000000000000000000000000000000000000000000000000000000","0101000010011011000000100000111000000000000000000000000000000000000000000000000000000000000000000000","0010000011010000000011000000010000000000000000000000000000000000000000000000000000000100000000000000","0000000100000001001011010001111000000000000000000000000000000000000000000000000000000000000000000000","0000100000000001000000000000100000000000000000000000000000000000000000000000000000000000000000000000","0010000010000100000010010000110010000000000000000000000000000000000000000000000000000000000000000000","0000010000100000100001100010001000000000000000000000000000000000000000000000000000000000000000000000","0100000000010010010101010001011000000000000000000000000000000000000000000000000000000000000000000000","0000001001000010011000000000011000000000000000000000000000000000000000000000000000000000000000000000","0101000000000010100001011000000100000000000000000000000000000000000000000000000000000000000000000000","1001000000001001001010100000110100000000000000000000000000000000000000000000000000000000000000000000","1000001000010010000011010000010100000000000000000000000000000000000000000000000000000000000000000000","0101000100000010010011000011010110000000000000000000000000000000000000000000000000000000000000000000","0100000011010000000000011000111110000000000000000000000100000000000000000000000000000000000000000000","1000000000000010011000100000011010000000000000000000000000000000000000000000000000000000000000000000","0000000100000001001000000001101000000000000000000000000000000000000000000000000100000000000000000000","0000000010011000000100111000100000000000000000000000000000000000000000000000000000000000000000000000","0000000011011000010010001000111100000000000000000000000000000000000000000000000000000000000000000000","0110000000000001001011000101111100000000000000000000000000000000000000000000000000000000000000000000","0100000001000110010111001001011000000000000000000000000000000000000000000000000000000000000000000000","1110000000011000000101000001000100000000000000000000000000000000000000000000000000000000000000000000","0110000011000100000010110000110100000000000000000000000000000000000000000000000000000000000000000000","1000001101000001001010000001010100000000000000000000000000000000000000000000000000000000000000000000","0000000000000000000010010100000000000000000000000000000000000000000000000000000000000000000000000000","0110100000000100001100001001010100000000000000000000000000000000000000000000000000000000000000000000","0000000000000000100110101000101010000000000000000000000000000000000000000000000000000000000000000000","0010000000010110001010001100001010000000000000000000000000000000000000000000000000000000000000000000","1001000000000100010000101001110110000000000000000000000000000000000000000000000000000000000000000000","0010000000000100000100000000000110000000000000000000000000000000000000000000000000000000000000000000","0010000000000101001000000000110110000000000000000000000000000000000000000000000000000000000000000000","1000000010010010001101011000010100000000000000000000000000000000000000000000000010000000000000000000","0000000000000000001000000000010000000000000000000000000000000000000000000000000000000000000000000000","0000000111010110000001010010000110000000000000000000000000000000000000000000000000000000000000000000","0100000101000100001110100000010010000000000000000000000000000000000000000000000000000000000000000000","0001000000000101010100011000110100000000000000000000000000000000000000000000000000000000000000000000","1001000000000001000000110000111100000000000000000000000000000000000001000000000000000000000000000000","0000110000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","0010001001000011001101000111110110000000000000000000000000000000000000000000000000000000000000000000","1010001000010010100000000000100000000000000000000000000000000000000000000000000000000000000000000000","1110001010010100010010001001101000000000000000000000000000000000001000000000000000000000000000000000","1100000000000010000111100101101000000000000000000000000000000000000000000000000000000000000000000000","1011000011001011000000101001100000000000000000000000000000000000000000000000000000000000000000000000","0000100000100000000000011010100010000000000000000000000000000000000000000000000000000000000000000000","1000001000000000100100100000011010000000000000000000000000000000000000000000000000000000000000000000","0100000010000110011100010000001110000000000000000000000001000000000000000000000000000000000000000000","0100100000100000101000000000100000000000000000000000000000000000000000000000000000000000000000000000","0000000011001100011110111000010010000000000000000000000000000000000000000000000000000000000000000000","0000001100010010011000100001101100000000000000000000000000000000000000000000000000000000000000000000","0000000000100000000000001000000100000000000000000000000000000000000000000000000000000000000000000000","0000000000100000000101000111010000000000000000000000000000000000000000000000000000000000000000000000","0001010001000001001000011011001110000000000000000000000000000000000000000000000000000000000000000000","1010000100010100000010100100010110000000000000000000000000000000000000000000000000000000000000000000","0111001000010010001000011010010000000000000000000000000000000000000000000000000000000000000000000000","0100100001000000011110001010001100000000000000000000000000000000000000000000000000000000000000000000","0000001100010100010101010000111000000000000000000000000000000000000000000000000000000000000000000000","0110000001001100001100101000001100000000000000000000000000000000000000000000000000000000000000000000","0101000000000100001000100001100010000000000000000000000000000000000000000000000000000000000000000000","1010000010010000000001001000110010000000000000000000000000000000000000000000000000000000000000000000","1000000101010010001010111001010010000000000000000000000000000000000000000000000000000000000000000000","1001000000000000010001001001000110000000000000000000000000000000000000000000000000000000000000000000","0010000110011010001001100100011110000000000000000000000000000000000000000000000000000000000000000000","0100000000000000001001100001001110000000000000000000000000000000000000000000000000000000000000000000","1100000100010001001101001000001010000000000000000000000000000000000000000000000000000000000000000000","0000000000000000000000000000000001010001010010100100101101101011110000001000000000000000000000000000","0000000000000000000000000000000000101000011000010010010000000000010000000000000000000000000000000000","0000000000000000000000000000000000010000000110101110111001000001110000010010110110000000000000000000","0000000000000000000000000000000001010010101110000000001000101000011000000010110010000000000000000000","0000000000000000000000000000000001011101001100010110100000000000001000000000100000000000000000000000","0000000000000000000000000000000000001010001110101100101000101000110000001001000000000000000000000000","0000000000000000000000000000000000000101101100001000001000000000111100000100000000000000000000000000","0000000000000000000000000000000000000101000000011101001001001100000100010011000110000000000000000000","0000000000000000000000000000000000011010101010000110101100000000001000000001010000000000000000100000","0000000000000000000000000000000000010001000110011000111000000100001100100000110010000000000000000000","0000000000000000000000000000000000011011000100000110010100100011101000001100100000000000000000000000","0000000000000000000000000000000000000100111010000001000000001001001000000101110000000000000000000000","0000000000000000000000000000000000010111010010001000000100000110101100100010100100000000000000000000","0000000000000000000000000000000001001100100010001000000001101000000000001111000100000000000000000000","0000000000000000000000000000000001010000111110001000001010000110010000000001010000000000000000000000","0000000000000000000000000000000000010011000111100001111000000001000100100100100000000000000000000000","0000000000000000000000000000000000000001000001000000000010010000000000010000001000000000000000000000","0000000000000000000000000000000001110001000000000000000000000000000011000000001000000000000000000000","0000000000000000000000000000000000001001000011000110001000001110000000000010010100000000000000000000","0000000000000000000000000000000000110110100101001001000001010111001000000000000000000000000000000000","0000000000000000000000000000000000011100000111001010000100000000000000101100010000000000000000000000","0000000000000000000000000000000000111101101000010011001000000000010000000110100010000000000000000000","0000000000000000000000000000000001000100001100001111100000100001100000100010000100000000000000000000","0000000000000000000000000000000001001010000010101100001000101000100001000010110000000000000000000000","0000000000000000000000000000000001010001000110011010001100000101111001000000000100000000000000000000","0000000000000000000000000000000000001100000000000001000000001101100101111000011100000000000000000000","0000000000000000000000000000000000000000000100001011100000101010100000001101110100000000000000000000","0000000000000000000000000000000000011000001010010100000001110100101000100010010000000000000000000000","0000000000000000000000000000000000001100000100010001000101100000001100001111101010000000000000000000","0000000000000000000000000000000000000000101010001010000100000111000001000011010110000000000000000000","0000000000000000000000000000000000010011000010010000000100100111010101101000010000000000000000000000","0000000000000000000000000000000000100000000000000000000000000101000000000010001010000000000000000000","0000000000000000000000000000000001010000001000011010000001100010010000000011010110000000000000000000","0000000000000000000000000000000001010001101000010101000000000011000010001101000000000000000000000000","0000000000000000000000000000000000111000000000010100100001000110000000101001000110000000000000000000","0000000000000000000000000000000000000010000000010000000101000101100100001100110100000000000000000000","0000000000000000000000000000000001011000001010000000000100000000010100100000011000000000000000000000","0000000000000000000000000000000001010001011000000110001100011000010101000111000000000000000000000000","0000000000000000000000000000000000100000000000100000000000001000100000010010100000000000000000000000","0000000000000000000000000000000000001010000000011000101101000000000010100110000110000000000000000000","0000000000000000000000000000000000010000100000001010100101101010011000000010000000000000000000000000","0000000000000000000000000000000000000100000100000100001100000010110100101010000100000000000000000000","0000000000000000000000000000000000101100001100000010001000001010000001010000000010000000000000000000","0000000000000000000000000000000000100000010000000000010010010100000011000001000000000000000000000000","0000000000000000000000000000000000000111100100010001000110111000110010000001000110000000000000000000","0000000000000000000000000000000000001100101010000100101000110100101100000110000010000000000000000000","0000000000000000000000000000000000001100100000000000100001011101001001100100010100000000000000000000","0000000000000000000000000000000000000000000000000000000000000000000000000000000000001011000001000010","0000000000000000000000000000000001000000001010000010100000000000000000000000000001111000100100100001","0000000000000000000000000000000000001001000010010000001000000000000000000000000000111010001000101100","0000000000000000000000000000000000000000010000100000010000000000000000000010000001100000000001000010","0000000000000000000000000000000000101100000110011000101000000000000000000000000000100001001011101100","0000000000000000000000000000000000010111100000010000100000000000000000000000000000000000001100010010","0000000000000000000000000000000000010010001000010000000000000000000000000000000000101000101000010000","0000000000000000000000000000000000010000100000001010001000000000000000000000000000110010001111001001","0000000000000000000000000000000000010000001010011000001000000000000000000000000000011110010111011000","0000000000000000000000000000000001000010000000000101000000000000000000000000000000110110001001001000","0000000000000000000000000000000000000001000010011010000000000000000000000000000000110000010001010100","0000000000000000000000000000000001100110000110000000001000000000000000000000000000000001100000110011","0000000000000000000000000000000000000001000100010100000000000000000000000000000000001000010000010101","0000000000000000000000000000000000000011000010001001100000000000000000000000000000010010110000000110","0000000000000000000000000000000001001010000100010000000000000000000000000000000000101010101000111000","0000000000000000000000000000000000000110000100001001000000000000000000000000000001100010100100100101","0000000000000000000000000000000000010001001000000001001000000000000000000000000000100101100110010101","0000000000000000000000000000000001010010001010001000101000000000010000000000000000011000110000011011","0000000000000000000000000000000000000000000001000000000000000000000000000000000000000000100100110010","0000000000000000000000000000000000000010000110000100100000000000000000000000000000010010000110001001","0000000000000000000000000000000000010000000010010110000000000000000000000000000000001101111001010110","0000000000000000000000000000000000000010000000001111000000000000000000000000000000100110010100100001","0000000000000000000000000000000000010010100000000100100000000000000000000000000000000110110100000010","0000000000000000000000000000000000000000001000001000101000000000000000000000000000101001010100010100","0000000000000000000000000000000000010100001001110010000000000000000000000000000000110000011000100001","0000000000000000000000000000000000011010000010000001001000000000000000000000000000010000101010010101","0000000000000000000000000000000001010000000110000001001000000000000000000000000000110000011010010000","0000000000000000000000000000000000011000001100011000000000000000000000000000000000000001000010011000","0000000000000000000000000000000001000000000110110000001000000000000000000000000000000100001100101010","0000000000000000000000000000000000000001001100010011100000000000000000000000000000011010010100011001","0000000000000000000000000000000000001100000001110000100000000000000000000000000000010101010111000010","0000000000000000000000000000000000000000101100001110100000000000000000000000000000100100101000101101","0000000000000000000000000000000000100000010000100000000000000000000000000000000001000000000000010010","0000000000000000000000000000000000001000000010011010001000000000000000000000000000000110000000110101","0000000000000000000000000000000000000010001010000101000000000000000000000000000000110010100010110100","0000000000000000000000000000000000011000000000001011000000000000000000000000000000110100001000110001","0000000000000000000000000000000000010010010010000010001000000000000000000000000000110111001000101000","0000000000000000000000000000000000010001000010000000001000000000000000000000000000100000010100001100","0000000000000000000000000000000000011000000000010110000000000000000000000000000001100000000110110000","0000000000000000000000000000000000000000000101000000010000000000000000000000000000011001000110000000","0000000000000000000000000000000001001010000000100011100000000000000000000000000000001000010000100000","0000000000000000000000000000000001001010110000001000000000000000000000000000000000001000101000010000","0000000000000000000000000000000000001000101000011100100000000000000000000000000000000100010101001001","0000000000000000000000000000000000010100100000100010001000000000000000000000000000001100001100001001","0000000000000000000000000000000000000000101000010010100000000000000000000000000000011001001110100001","0000000000000000000000000000000000000000101100010000001000000000000000000000000000110000001111010100","0000000000000000000000000000000001010000001000010000100000000000000000000000000000010010100000100100","0000000000000000000000000000001000100000010000000000000000000000000000000000000001000101000000100001","0000000000000000000000000000000001001000100010000000101000000000000000000000000000110010101000011000","0000000000000000000000000000000000001100101000001000000000000000000000000000000000110001000010110110","0000000000000000010000000000000000001001100100000110100000000000100000000000000000010011000000010011","0000000000000000000000000000000000001001000000000011010000000000000000000000000000101101110100001100","0000000000000000000000000000000001010001100010000000100000000000000000000000000000100010000010000011","0000000000000000000000000000000000100000000000000100101000000000000000000000000001111111110010000001","0000000000000000000000000000000000000000001110000110100000000000000000000000000000001000011101000101","0000000000000000000000000000000000010010100110010001000000000000000000000000000000111110000010000000","0000000000000000000000000000000001000000101000000001100000000000000000000000000000000100010000111000","0000000000000000000000000000000000010000000110000000101000000000000000000000000000100110110100110001","0000000000000000000000000000000001000000000000000111000000000000000000000000000001111000001110101000","0000000000000000000000000000000001001111100010000001000000000000000000000000000000001110100000010001","0000000000000000000000000000000000000010100100010000000000000000000000000000000000101010111000101111","0000000000000000000000000000000001011111000000010100001000000000000000000000000000000010000100010010","0000000000000000000000000000000001001100001000000010000000000000000000000000000001001100111000110001","0000000000000000000000000000000000010001100010001010100000000000000000000000000000011000001100010001","0000000000000000000000000000000000010000101100001000001000000000000000000000000000100110110101101000","0000000000000000000000000000000000010101100000001000100000000000000000000000000001001100010000100100","0000000000000000000000000000000000011001001110000100000000000000000000000000000001000100000010010011","0000000000000000000000000000000000001001100100001000001000000000000000000000000000111100000110000100","0000000000000000000000000000000001001000100100000010100000000000000000000000000001010000011100011000","0000000000000000000000000000000000100000010000100000000000000000000000000000000001000010000000110110","0000000000000000000000000000000000000001010000000000000000000000000000000000000000100001100010000110","0000000000000000000000010000000001000000001000010100100000000000000000000000000000101110000100001001","0000000000000000000000000000000001000001001010000111101000000000000000000000000000011100101000000100","0000000000000000000000000000000000000000000100000000100000000000000000000000000000010010111110010100","0000000000000000000000000000000000000000000100000001001000000000000000000000000000101001110100110101","0000000000000000000000000000000001011100001000010110000000000000000000000000000000000010100010000110","0000000000000000000000000000000000000001000010000011100000000000000000000000000000101100001010100000","0000000000000000000000000000000000001011000000010100100000000000000000000000000000011000001100101100","0000000000000000000000000000000001000100101000000001000000000000000000000000000000010010011110000010","0000000000000000000000000000000001000000000110000000101000000000000000000000000000110000000000001000","0000000000000000000000000000000000100000000000000000010000000000000000000000000000000001001001000010","0000000000000000000000000000000001000111000000010000001000000000000000000000000000111000101010010000","0000000000000000000000000000000000100000010001000000010000000000000000000000000001000000000100000000","0000000000000000000000000000000000000001101000011011100000000000000000000000000000010001010100101011","0000000000000000000000000000100000000000000000100000000000000000000000000000000000000011110001010000","0000000000000000000000000000000001001000001000000000000000000000000000000000000000111100011110110000","0000000000000000000000000000000000000000001011000001001000000000000000000000000000100111010001001001","0000000000000000000000000000000000100000000001000000000000000000000000000000000001000000000011101000","0000000000000000000000000000000000001000101000000001000000000000000000000000000000010000010100001111","0000000000000000000000000000000000000000010000100000000000000000000000000000000000000000110000100110","0000000000000000000000000000000000001001000100010000100000000000000000100000000000101100001001010001","0000000000000000000000000000000000000100100000011001000000000000000000000000000000101010101000001000","0000000000000000000000000000000000100000110001000000000000000000000000000000000000000010000001000011","0000000000000000000000000000000001000000000000001000000000000000000000000000000000010100100010110010","0000000000000000000000000000000001000001100100000100000000000000000000000000000000100100101110001001","0000000000000000000000000000000000001010101000000010001000000000000000000000000000000100110010010001","0000000000000000000000000000000001000010001000000000101000000000000000000000000000010000001100100000","0000000000000000000000000000000000000000000000010110101000000000000000000000000000001100110100100000","0000000000000000000000000000000000010100100110001100000000000000000000000000000000000100100100100110","0000000000000000000000000000000000000000010000000000000000000000000000000000000001000001010010100110","0000000000000000000000000000000001011111100010000000000000000000000000000000000000101000001100110000","0000000000000000000000000000000000011000000110000100100000000000000000000000000000100010000010011000","0000000000000000000000000000000001001001001010001000001000000000000000000000000000011001100000011000","0000000000000000000000000000000000000000000001100000000000000000000000000000000001100000000001100000","0000000000000000000000000000000000011100101100011000000000000000000000000000000000000100011000101101","0000000000000000000000000000000001011011100010000001000000000000000000000000000000001010001100000001"],"u_bounds":[0,75,147,171,194,300],"v_bounds":[0,18,33,55,81,100],"topics":["요리","여행","게임","음악","코딩"]},"tags":["ai","e스포츠","kpop","rpg","게임","공략","국내","기타","디저트","여행","요리","웹","유럽","음악","캠핑","코딩","파이썬","피아노","한식"]};
+const CODE = {"lab1":"liked = [0,1]                                    # 사용자 A가 좋아한 영상 \"스노보드 묘기, 스키 초보 강습\"\nprofile = X_toy[liked].mean(axis=0)               # ① 프로필 = 좋아한 영상 피처의 평균\nprint(\"좋아한 영상 피처의 평균값 :\",profile)\nscores = cosine_similarity([profile], X_toy)[0]   # ② 프로필과 모든 영상의 유사도\nscores[liked] = -1                                # ③ 이미 본 영상은 제외\nprint(\"개인 선호도 벡터와 각 영상간의 유사도 점수 :(이미 본 영상은 제외)\",scores)\n#assert np.isclose(profile.sum(), 3.0), '프로필의 합이 3이어야 합니다 (태그 3개씩 두 영상의 평균)'\nprint('✅ 통과')\ntoy.assign(score=scores.round(3)).sort_values('score', ascending=False)\n\nsim_users = cosine_similarity(R)          # 사용자 × 사용자 유사도 (4×4)\nnp.fill_diagonal(sim_users, 0)            # 자기 자신은 빼고\nscores = sim_users[0] @ R                 # A와 비슷한 사용자들이 본 영상의 가중합\nscores[R[0] == 1] = -1                    # 이미 본 영상 제외\nprint('✅ 통과   D와 사용자들의 유사도:', sim_users[0].round(3))\ntoy.assign(score=scores.round(3)).sort_values('score', ascending=False)\n\nnew_tags = vec.transform(['썰매 겨울 놀이']).toarray()        # 처음 보는 태그('썰매','놀이')는 무시되고 '겨울'만 남음\ncb_score = cosine_similarity([profile], new_tags)[0, 0]        # 콘텐츠 기반: 태그만 있으면 계산 가능\nR_new = np.hstack([R, np.zeros((4, 1))])                       # 협업 필터링: 새 열은 전부 0 : 모두 안봤다.\ncf_score = (sim_users[0] @ R_new)[-1]\nprint(f'콘텐츠 기반 점수 = {cb_score:.3f}   ← 바로 추천 가능')\nprint(f'협업 필터링 점수 = {cf_score:.3f}   ← 아무도 안 봤으니 영원히 0 (콜드 스타트)')","lab2":"log['label'] = ((log.like == 1) | (log.watch_frac >= 0.5)).astype(int)\nassert log.label.sum() == 4691, f'관련 라벨 수가 다릅니다: {log.label.sum()}'\nprint(f'✅ 통과   관련 있음 비율 = {log.label.mean():.1%}   (좋아요만 쓰면 {log.like.mean():.1%} — 명시적 피드백은 희소하다)')\n\ndef precision_at_k(rec, relevant, k=10):\n    return len(set(rec[:k]) & relevant) / k\n\ndef average_precision(rec, relevant, k=10):\n    hits, total = 0, 0.0\n    for i, v in enumerate(rec[:k], start=1):\n        if v in relevant:                    # i번째가 정답일 때만 그 위치의 Precision@i 를 더한다\n            hits += 1\n            total += hits / i\n    return total / min(len(relevant), k)\n\ndef diversity(rec):                          # 추천 목록 안 영상끼리의 평균 유사도 (낮을수록 다양)\n    S = cosine_similarity(X[rec]); n = len(rec)\n    return (S.sum() - n) / (n * (n - 1))\n\n# 슬라이드 예시로 자체 검증: 상위 5개의 정답 여부 = [1, 0, 1, 0, 0]\nrec, rel = ['a', 'b', 'c', 'd', 'e'], {'a', 'c'}\nassert np.isclose(precision_at_k(rec, rel, k=5), 0.4)\nassert np.isclose(average_precision(rec, rel, k=5), (1/1 + 2/3) / 2)\nprint('✅ 통과   P@5 = 0.4,  AP@5 = 0.833')","lab3":"def wals(A, d=8, w0=0.1, lam=0.1, n_iter=10, seed=0):\n    r = np.random.default_rng(seed)\n    U = r.normal(0, 0.1, (A.shape[0], d))           # 사용자 임베딩 (무작위 초기화)\n    V = r.normal(0, 0.1, (A.shape[1], d))           # 영상 임베딩\n    W = np.where(A > 0, 1.0, w0)                    # 관찰된 칸 가중치 1, 빈칸 가중치 w0\n    I = lam * np.eye(d)                             # 작은 규제항\n    for _ in range(n_iter):\n        for i in range(A.shape[0]):                 # ① V 고정 → 사용자 i 의 임베딩을 푼다\n            U[i] = np.linalg.solve(V.T @ (W[i][:, None] * V) + I, V.T @ (W[i] * A[i]))\n        for j in range(A.shape[1]):                 # ② U 고정 → 영상 j 의 임베딩을 푼다\n            V[j] = np.linalg.solve(U.T @ (W[:, j][:, None] * U) + I, U.T @ (W[:, j] * A[:, j]))\n    return U, V\n\nU_mf, V_mf = wals(A_train)\nMF = U_mf @ V_mf.T                                  # 모든 (사용자, 영상) 쌍의 예측 점수\nprint('사용자 0의 예측 점수 상위 5개 영상:', np.argsort(-MF[0])[:5])\n\nrows = []\nfor w0 in [0.0, 1.0, 0.1]:\n    U_, V_ = wals(A_train, w0=w0)\n    P_ = U_ @ V_.T\n    r = evaluate(f'행렬 분해 w0={w0}', lambda u: top_k(P_[u], u))\n    r['관찰칸 평균예측'] = P_[A_train == 1].mean()\n    r['빈칸 평균예측'] = P_[A_train == 0].mean()\n    rows.append(r)\npd.DataFrame(rows).round(3)","lab4":"import keras\nfrom keras import layers\nkeras.utils.set_random_seed(0)\n\nuser_in  = keras.Input(shape=(user_feat.shape[1],), name='user_features')\nvideo_in = keras.Input(shape=(video_feat.shape[1],), name='video_features')\nuser_tower  = keras.Sequential([layers.Dense(32, activation='relu'), layers.Dense(16)], name='user_tower')\nvideo_tower = keras.Sequential([layers.Dense(32, activation='relu'), layers.Dense(16)], name='video_tower')\n\nuser_emb, video_emb = user_tower(user_in), video_tower(video_in)\ndot = layers.Dot(axes=1)([user_emb, video_emb])                       # 유사도 = 내적\nmodel = keras.Model([user_in, video_in], layers.Activation('sigmoid')(dot))\nmodel.compile(optimizer='adam', loss='binary_crossentropy', metrics=['AUC'])\n\ntrain = log.merge(test[['user_id', 'video_id']], how='left', indicator=True).query('_merge == \"left_only\"')\nhist = model.fit([user_feat[train.user_id], video_feat[train.video_id]], train.label.values,\n                 epochs=10, batch_size=256, validation_split=0.1, verbose=0)\nprint(f'✅ 학습 완료   검증 AUC = {hist.history[\"val_AUC\"][-1]:.3f}')","lab5":"def recommend(u, k=10, max_per_topic=4):\n    seen = A_train[u] == 1\n    # ① 후보 생성: 두 생성기의 결과를 합친다\n    cand_mf  = [v for v in np.argsort(-MF[u]) if not seen[v]][:30]\n    cand_pop = [v for v in np.argsort(-popular) if not seen[v]][:10]\n    candidates = set(cand_mf) | set(cand_pop)\n    # ② 점수 매기기: 투 타워 점수 순\n    ranked = sorted(candidates, key=lambda v: -TT[u, v])\n    # ③ 재순위: 한 주제가 목록을 독차지하지 않게\n    out, count = [], {}\n    for v in ranked:\n        t = videos.topic[v]\n        if count.get(t, 0) < max_per_topic:\n            out.append(v); count[t] = count.get(t, 0) + 1\n        if len(out) == k:\n            break\n    return out\n\nu = 0\nprint(f'사용자 {u}: 나이 {users.age[u]}, 언어 {users.language[u]}  (숨은 취향: {users.fav[u]})')\nvideos.loc[recommend(u), ['video_id', 'topic', 'tags', 'language']]","lab6":"new_user = pd.DataFrame({'age': pd.cut([17], bins=[0, 19, 29, 39, 100], labels=['10대', '20대', '30대', '40+']),\n                         'lang': ['ko'], 'dev': ['mobile']})\nnew_demo = pd.get_dummies(new_user).reindex(columns=pd.get_dummies(\n    pd.DataFrame({'age': age_band, 'lang': users.language, 'dev': users.device})).columns, fill_value=0).values\nnew_feat = np.hstack([new_demo, np.zeros((1, X.shape[1]))]).astype('float32')   # 시청 기록 = 0\n\nemb = user_tower.predict(new_feat, verbose=0)\ntop = np.argsort(-(emb @ V_tt.T)[0])[:10]\nprint('17세·한국어·모바일 신규 사용자에게 추천된 주제:', videos.topic[top].value_counts().to_dict())\n\nnew_video = np.hstack([vec_tags.transform(['게임 공략']).toarray(), [[0, 1]], [[10 / 60]]]).astype('float32')   # en=0, ko=1, 10분\nv_emb = video_tower.predict(new_video, verbose=0)\nfans = np.argsort(-(U_tt @ v_emb.T)[:, 0])[:20]\nprint('이 새 영상과 가장 잘 맞는 사용자 20명의 숨은 취향:', users.fav[fans].value_counts().to_dict())"};
+
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const fmt = (v, d = 3) => Number(v).toFixed(d);
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function tipFor(container) {
+  let t = container.querySelector(".tip");
+  if (!t) { t = document.createElement("div"); t.className = "tip"; container.appendChild(t); }
+  return {
+    show(html, x, y) { t.innerHTML = html; t.style.left = x + "px"; t.style.top = y + "px"; t.classList.add("on"); },
+    hide() { t.classList.remove("on"); }
+  };
+}
+function bindTips(container) {
+  const tip = tipFor(container);
+  container.querySelectorAll("[data-tip]").forEach((el) => {
+    const on = () => {
+      const r = el.getBoundingClientRect(), c = container.getBoundingClientRect();
+      const ax = el.dataset.tx ? Number(el.dataset.tx) : r.left + r.width / 2 - c.left;
+      const ay = el.dataset.ty ? Number(el.dataset.ty) : r.top - c.top;
+      tip.show(el.dataset.tip, Math.min(Math.max(ax, 70), c.width - 70), ay);
+    };
+    el.addEventListener("mouseenter", on); el.addEventListener("focus", on);
+    el.addEventListener("mouseleave", tip.hide); el.addEventListener("blur", tip.hide);
+  });
+}
+function ticks(min, max, step) { const out = []; for (let v = min; v <= max + 1e-9; v += step) out.push(+v.toFixed(6)); return out; }
+
+/* ---------- short model names for narrow charts ---------- */
+const SHORT = { "파이프라인 (재순위 없음)": "파이프라인", "파이프라인 (주제당 최대 4)": "파이프라인 + 재순위", "아이템 기반 CF": "아이템 CF", "행렬 분해 (WALS)": "WALS", "인기순 (기준선)": "인기순" };
+const nm = (name, W) => (W < 480 && SHORT[name]) || name;
+
+/* ---------- chart: horizontal grouped bars ---------- */
+function drawAcc() {
+  const el = $("#chart-acc"); const W = Math.max(el.clientWidth, 280);
+  const rows = D.results;
+  const left = W < 480 ? 104 : 150, right = 44, top = 8, bottom = 28;
+  const band = 34, H = top + bottom + rows.length * band;
+  const xmax = 0.3, x = (v) => left + (v / xmax) * (W - left - right);
+  const bh = 11, gap = 2;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="방식별 P@10과 mAP@10 막대 그래프">`;
+  ticks(0, xmax, 0.1).forEach((t) => {
+    s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top}" y2="${H - bottom}" stroke="var(--grid)" stroke-width="1"/>`;
+    s += `<text x="${x(t)}" y="${H - bottom + 18}" text-anchor="middle" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${t.toFixed(1)}</text>`;
+  });
+  const best = rows.reduce((a, b) => (b["P@10"] > a["P@10"] ? b : a));
+  rows.forEach((r, i) => {
+    const cy = top + i * band + band / 2;
+    const isBest = r === best;
+    s += `<text x="${left - 10}" y="${cy + 4}" text-anchor="end" font-size="12.5" fill="var(--ink${isBest ? "" : "-2"})" font-weight="${isBest ? 600 : 400}">${esc(nm(r["모델"], W))}</text>`;
+    [["P@10", "var(--s1)", -1], ["mAP@10", "var(--s2)", 1]].forEach(([k, c, dir]) => {
+      const y = dir < 0 ? cy - bh - gap / 2 : cy + gap / 2;
+      const w = Math.max(x(r[k]) - left, 1);
+      s += `<path d="M${left},${y} h${w - 4} a4,4 0 0 1 4,4 v${bh - 8} a4,4 0 0 1 -4,4 h${-(w - 4)} z" fill="${c}" tabindex="0" data-tip="<b>${esc(r["모델"])}</b><br>${k} ${fmt(r[k])}"/>`;
+    });
+    if (isBest) s += `<text x="${x(r["P@10"]) + 6}" y="${cy - 2}" font-size="11.5" fill="var(--ink)" font-family="var(--font-mono)">${fmt(r["P@10"])}</text>`;
+  });
+  s += `<line x1="${left}" x2="${left}" y1="${top}" y2="${H - bottom}" stroke="var(--axis)" stroke-width="1"/>`;
+  el.innerHTML = s + "</svg>"; bindTips(el);
+}
+
+/* ---------- chart: accuracy vs diversity scatter ---------- */
+function drawTrade() {
+  const el = $("#chart-trade"); const W = Math.max(el.clientWidth, 280), H = 300;
+  const L = 46, R = 16, T = 12, B = 40;
+  const x0 = 0.05, x1 = 0.3, y0 = 0.15, y1 = 0.6;
+  const x = (v) => L + (v - x0) / (x1 - x0) * (W - L - R);
+  const y = (v) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+  const K = "평균 유사도(↓다양)";
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="P@10과 평균 유사도의 산점도">`;
+  ticks(0.2, 0.6, 0.1).forEach((t) => {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/>`;
+    s += `<text x="${L - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${t.toFixed(1)}</text>`;
+  });
+  ticks(0.1, 0.3, 0.05).forEach((t) => {
+    s += `<text x="${x(t)}" y="${H - B + 18}" text-anchor="middle" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${t.toFixed(2)}</text>`;
+  });
+  s += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--axis)"/>`;
+  s += `<text x="${W - R}" y="${H - 4}" text-anchor="end" font-size="11.5" fill="var(--muted)">P@10 →</text>`;
+  const byName = Object.fromEntries(D.results.map((r) => [r["모델"], r]));
+  const a = byName["파이프라인 (재순위 없음)"], b = byName["파이프라인 (주제당 최대 4)"];
+  s += `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker></defs>`;
+  const ax = x(a["P@10"]) - 8, ay = y(a[K]) + 4, bx = x(b["P@10"]) + 4, by = y(b[K]) - 9;
+  const cx0 = Math.min(ax, bx) - 70, cy0 = (ay + by) / 2;
+  s += `<path d="M${ax},${ay} Q${cx0},${cy0} ${bx},${by}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#arr)"/>`;
+  const lab = {
+    "인기순 (기준선)": [8, -10, "start"], "콘텐츠 기반": [10, 4, "start"], "아이템 기반 CF": [10, -6, "start"],
+    "행렬 분해 (WALS)": [10, 14, "start"], "투 타워": [-10, -10, "end"], "파이프라인 (재순위 없음)": [null],
+    "파이프라인 (주제당 최대 4)": [10, 14, "start"]
+  };
+  D.results.forEach((r) => {
+    const cx = x(r["P@10"]), cy = y(r[K]);
+    const hi = r["모델"].startsWith("파이프라인") || r["모델"] === "투 타워";
+    s += `<circle cx="${cx}" cy="${cy}" r="6" fill="${hi ? "var(--s1)" : "var(--surface)"}" stroke="var(--s1)" stroke-width="2" tabindex="0" data-tx="${cx}" data-ty="${cy - 8}" data-tip="<b>${esc(r["모델"])}</b><br>P@10 ${fmt(r["P@10"])} · 평균 유사도 ${fmt(r[K])}"/>`;
+    const o = lab[r["모델"]];
+    if (o && o[0] !== null) {
+      const name = r["모델"] === "투 타워" ? "투 타워 · 파이프라인" : r["모델"].replace("파이프라인 (주제당 최대 4)", "재순위 적용");
+      s += `<text x="${cx + o[0]}" y="${cy + o[1]}" text-anchor="${o[2]}" font-size="${W < 480 ? 11 : 12}" fill="var(--ink-2)">${esc(W < 480 && name.length > 8 ? nm(r["모델"], W).replace("투 타워", "투 타워 외") : name)}</text>`;
+    }
+  });
+  el.innerHTML = s + "</svg>"; bindTips(el);
+}
+
+/* ---------- chart: loss curves ---------- */
+function drawLoss() {
+  const el = $("#chart-loss"); const W = Math.max(el.clientWidth, 280), H = 240;
+  const L = 42, R = 14, T = 10, B = 34;
+  const n = D.loss_curve.length;
+  const x = (i) => L + (i / (n - 1)) * (W - L - R);
+  const y = (v) => T + (1 - v / 0.6) * (H - T - B);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="에폭별 학습 손실과 검증 손실">`;
+  ticks(0, 0.6, 0.2).forEach((t) => {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="${t === 0 ? "var(--axis)" : "var(--grid)"}"/>`;
+    s += `<text x="${L - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${t.toFixed(1)}</text>`;
+  });
+  for (let i = 0; i < n; i++) if (i % (W < 420 ? 3 : 1) === 0 || i === n - 1)
+    s += `<text x="${x(i)}" y="${H - B + 18}" text-anchor="middle" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${i + 1}</text>`;
+  s += `<text x="${W - R}" y="${H - 2}" text-anchor="end" font-size="11.5" fill="var(--muted)">에폭 →</text>`;
+  [[D.loss_curve, "var(--s1)"], [D.val_loss_curve, "var(--s2)"]].forEach(([arr, c]) => {
+    s += `<polyline points="${arr.map((v, i) => `${x(i)},${y(v)}`).join(" ")}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`;
+    s += `<circle cx="${x(n - 1)}" cy="${y(arr[n - 1])}" r="4" fill="${c}" stroke="var(--surface)" stroke-width="2"/>`;
+  });
+  s += `<line id="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="3 3" opacity="0"/>`;
+  s += `<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="loss-hit"/>`;
+  el.innerHTML = s + "</svg>";
+  const tip = tipFor(el), hit = $("#loss-hit", el), xh = $("#xh", el);
+  hit.addEventListener("mousemove", (e) => {
+    const r = el.getBoundingClientRect(); const px = (e.clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(n - 1, Math.round((px - L) / ((W - L - R) / (n - 1)))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", 1);
+    tip.show(`<b>에폭 ${i + 1}</b><br>학습 ${fmt(D.loss_curve[i])} · 검증 ${fmt(D.val_loss_curve[i])}<br>검증 AUC ${fmt(D.auc_curve[i])}`, x(i) * (r.width / W), y(D.val_loss_curve[i]) * (r.width / W) - 6);
+  });
+  hit.addEventListener("mouseleave", () => { tip.hide(); xh.setAttribute("opacity", 0); });
+}
+
+/* ---------- chart: histogram ---------- */
+function drawHist() {
+  const el = $("#chart-hist"); const W = Math.max(el.clientWidth, 280), H = 240;
+  const L = 48, R = 10, T = 18, B = 34;
+  const n = D.watch_hist.length, max = 6000;
+  const bw = (W - L - R) / n;
+  const y = (v) => T + (1 - v / max) * (H - T - B);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="시청 비율 구간별 노출 건수">`;
+  ticks(0, max, 2000).forEach((t) => {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="${t === 0 ? "var(--axis)" : "var(--grid)"}"/>`;
+    s += `<text x="${L - 8}" y="${y(t) + 4}" text-anchor="end" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${t.toLocaleString()}</text>`;
+  });
+  D.watch_hist.forEach((v, i) => {
+    const x = L + i * bw + 1, w = bw - 2, top = y(v), h = H - B - top;
+    const c = i >= 5 ? "var(--s1)" : "var(--zero)";
+    s += `<path d="M${x},${H - B} v${-(h - 4)} a4,4 0 0 1 4,-4 h${w - 8} a4,4 0 0 1 4,4 v${h - 4} z" fill="${c}" tabindex="0" data-tip="<b>${i * 10}–${(i + 1) * 10}% 시청</b><br>${v.toLocaleString()}건"/>`;
+  });
+  [0, 50, 100].forEach((p) => {
+    const xx = L + (p / 100) * (W - L - R);
+    s += `<text x="${xx}" y="${H - B + 18}" text-anchor="${p === 0 ? "start" : p === 100 ? "end" : "middle"}" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${p}%</text>`;
+  });
+  const xm = L + 0.5 * (W - L - R);
+  s += `<line x1="${xm}" x2="${xm}" y1="${T - 8}" y2="${H - B}" stroke="var(--s2)" stroke-width="2"/>`;
+  s += `<text x="${xm + 6}" y="${T}" font-size="12" fill="var(--ink-2)">관련 기준</text>`;
+  el.innerHTML = s + "</svg>"; bindTips(el);
+}
+
+/* ---------- chart: relevance by group ---------- */
+function drawGroup() {
+  const el = $("#chart-group"); const W = Math.max(el.clientWidth, 280);
+  const rows = Object.entries(D.by_group);
+  const left = 78, right = 56, band = 52, T = 6, B = 28, H = T + B + rows.length * band;
+  const x = (v) => left + v * (W - left - right);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="취향 관계별 관련 비율 막대 그래프">`;
+  [0, 0.5, 1].forEach((t) => {
+    s += `<line x1="${x(t)}" x2="${x(t)}" y1="${T}" y2="${H - B}" stroke="var(--grid)"/>`;
+    s += `<text x="${x(t)}" y="${H - B + 18}" text-anchor="middle" font-size="11.5" fill="var(--muted)" font-family="var(--font-mono)">${t * 100}%</text>`;
+  });
+  rows.forEach(([g, r], i) => {
+    const cy = T + i * band + band / 2, bh = 18, w = Math.max(x(r.rel) - left, 1.5);
+    s += `<text x="${left - 10}" y="${cy + 1}" text-anchor="end" font-size="12.5" fill="var(--ink-2)">${esc(g)}</text>`;
+    s += `<text x="${left - 10}" y="${cy + 16}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--font-mono)">n=${Number(r.n).toLocaleString()}</text>`;
+    s += w > 6 ? `<path d="M${left},${cy - bh / 2} h${w - 4} a4,4 0 0 1 4,4 v${bh - 8} a4,4 0 0 1 -4,4 h${-(w - 4)} z" fill="var(--s1)" tabindex="0" data-tip="<b>${esc(g)}</b><br>관련 ${(r.rel * 100).toFixed(1)}% · 평균 시청 ${(r.watch * 100).toFixed(0)}%"/>`
+               : `<rect x="${left}" y="${cy - bh / 2}" width="${w}" height="${bh}" fill="var(--s1)" tabindex="0" data-tip="<b>${esc(g)}</b><br>관련 ${(r.rel * 100).toFixed(1)}% · 평균 시청 ${(r.watch * 100).toFixed(0)}%"/>`;
+    s += `<text x="${x(r.rel) + 8}" y="${cy + 4}" font-size="12.5" fill="var(--ink)" font-family="var(--font-mono)">${(r.rel * 100).toFixed(1)}%</text>`;
+  });
+  s += `<line x1="${left}" x2="${left}" y1="${T}" y2="${H - B}" stroke="var(--axis)"/>`;
+  el.innerHTML = s + "</svg>"; bindTips(el);
+}
+
+/* ---------- chart: feedback matrix heatmap ---------- */
+function drawHeat() {
+  const el = $("#chart-heat"); const M = D.matrix;
+  const W = Math.max(el.clientWidth, 280);
+  const L = 84, T = 22, R = 4, B = 4;
+  const nr = M.rows.length, nc = M.rows[0].length;
+  const cw = (W - L - R) / nc, ch = Math.max(1.1, Math.min(1.6, 420 / nr)), H = T + B + ch * nr;
+  const dpr = window.devicePixelRatio || 1;
+  let cv = el.querySelector("canvas");
+  if (!cv) { cv = document.createElement("canvas"); cv.setAttribute("role", "img"); cv.setAttribute("aria-label", "사용자 300명과 영상 100개의 학습용 피드백 행렬 히트맵"); el.appendChild(cv); }
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.height = H + "px";
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = css("--surface-2"); g.fillRect(L, T, W - L - R, ch * nr);
+  g.fillStyle = css("--s1");
+  for (let i = 0; i < nr; i++) { const row = M.rows[i]; for (let j = 0; j < nc; j++) if (row.charCodeAt(j) === 49) g.fillRect(L + j * cw, T + i * ch, Math.ceil(cw), Math.ceil(ch)); }
+  g.strokeStyle = css("--ink-2"); g.lineWidth = 1; g.globalAlpha = 0.55;
+  M.u_bounds.slice(1, -1).forEach((b) => { g.beginPath(); g.moveTo(L, T + b * ch + 0.5); g.lineTo(W - R, T + b * ch + 0.5); g.stroke(); });
+  M.v_bounds.slice(1, -1).forEach((b) => { g.beginPath(); g.moveTo(L + b * cw + 0.5, T); g.lineTo(L + b * cw + 0.5, T + nr * ch); g.stroke(); });
+  g.globalAlpha = 1; g.fillStyle = css("--muted"); g.font = `500 11.5px ${css("--font-sans")}`;
+  g.textAlign = "center"; g.textBaseline = "alphabetic";
+  M.topics.forEach((t, k) => { const a = M.v_bounds[k], b = M.v_bounds[k + 1]; g.fillText(t, L + ((a + b) / 2) * cw, T - 8); });
+  g.textAlign = "right"; g.textBaseline = "middle";
+  M.topics.forEach((t, k) => { const a = M.u_bounds[k], b = M.u_bounds[k + 1]; if (b - a >= 12) g.fillText(`${t} ${b - a}`, L - 8, T + ((a + b) / 2) * ch); });
+  g.save(); g.translate(10, T + nr * ch / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("사용자 (숨은 취향별)", 0, 0); g.restore();
+}
+
+/* ---------- lab cards ---------- */
+function highlight(src) {
+  return src.split("\n").map((line) => {
+    let q = null, idx = -1;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) { if (ch === q) q = null; }
+      else if (ch === "'" || ch === '"') q = ch;
+      else if (ch === "#") { idx = i; break; }
+    }
+    return idx < 0 ? esc(line) : esc(line.slice(0, idx)) + `<span class="cm">${esc(line.slice(idx))}</span>`;
+  }).join("\n");
+}
+function tableHTML(cols, rows, opts = {}) {
+  const head = cols.map((c) => `<th class="${c.n ? "n" : ""}">${esc(c.t)}</th>`).join("");
+  const body = rows.map((r, i) => `<tr class="${opts.best === i ? "best" : ""}">${cols.map((c) => `<td class="${c.n ? "n" : ""}">${esc(c.f ? c.f(r) : r[c.k])}</td>`).join("")}</tr>`).join("");
+  return `<div class="tbl-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+function buildLabs() {
+  const R = D.results, K = "평균 유사도(↓다양)";
+  const pick = (names) => R.filter((r) => names.includes(r["모델"]));
+  const resCols = [{ t: "방식", k: "모델" }, { t: "P@10", n: 1, f: (r) => fmt(r["P@10"]) }, { t: "mAP@10", n: 1, f: (r) => fmt(r["mAP@10"]) }, { t: "평균 유사도", n: 1, f: (r) => fmt(r[K]) }];
+  const labs = [
+    { k: "LAB 1 · 출발점", h: "콘텐츠 기반과 협업 필터링, 무엇이 다른가", p: "영상 6개, 사용자 4명의 장난감 데이터로 두 방식을 비교했습니다. 둘 다 유사도가 가장 높은 영상을 추천하는 같은 뼈대이고, 무엇으로 유사도를 재느냐만 다릅니다.", code: CODE.lab1, src: "노트북 1-1 · 1-2절",
+      res: `<div class="out">콘텐츠 기반 1위: 겨울 캠핑 브이로그 (0.365)  ← '겨울' 태그 공유
+협업 필터링 1위: 파이썬 기초 (0.707)      ← 취향이 같은 B가 시청
+새 영상 '눈썰매 타기'
+  콘텐츠 기반 점수 = 0.632  → 바로 추천 가능
+  협업 필터링 점수 = 0.000  → 콜드 스타트</div><p class="take"><b>정리</b> 콘텐츠 기반은 새 영상을 다루고 협업 필터링은 새 관심사를 찾습니다. 그래서 실제 시스템은 둘을 섞습니다.</p>` },
+    { k: "LAB 2 · 채점 기준", h: "관련성 라벨과 평가 지표를 먼저 정의", p: "모델을 비교하려면 채점 기준이 먼저 있어야 합니다. 관련성을 정의하고, 상위 10개 기준 정밀도, 평균 정밀도, 목록 내 다양성을 직접 구현했습니다.", code: CODE.lab2, src: "노트북 2-1 · 4절",
+      res: `<div class="out">관련 있음 비율 = 26.1%  (좋아요만 쓰면 7.9%)
+자체 검증: P@5 = 0.4, AP@5 = 0.833</div>${tableHTML(resCols, pick(["인기순 (기준선)"]))}<p class="take"><b>기준선</b> 모두에게 인기순으로 추천하면 P@10은 0.083입니다. 이후 모든 방식은 이 값과 비교합니다.</p>` },
+    { k: "LAB 3 · 행렬 분해", h: "WALS로 학습하고 빈칸 가중치를 비교", p: "피드백 행렬을 사용자 임베딩과 영상 임베딩의 곱으로 근사합니다. 한쪽을 고정하면 선형회귀가 되어 번갈아 풀 수 있습니다. 빈칸 가중치를 세 가지로 바꿔 비교했습니다.", code: CODE.lab3, src: "노트북 5-2 · 5-3절",
+      res: tableHTML([{ t: "빈칸 가중치", k: "모델" }, { t: "P@10", n: 1, f: (r) => fmt(r["P@10"]) }, { t: "관찰칸 예측", n: 1, f: (r) => fmt(r.obs) }, { t: "빈칸 예측", n: 1, f: (r) => fmt(r.unobs) }], D.w0, { best: 2 }) + `<p class="take"><b>결론</b> 0이면 모든 예측이 1로 퇴화하고, 1이면 0으로 쏠립니다. 0.1에서 균형이 맞고 정확도도 가장 높았습니다.</p>` },
+    { k: "LAB 4 · 신경망", h: "투 타워 신경망으로 피처까지 학습", p: "사용자 타워와 영상 타워가 각자 16차원 임베딩을 만들고, 내적과 시그모이드로 관련 확률을 예측합니다. 노출됐지만 관련 없던 영상을 음성 예시로 썼고, 테스트 정답 쌍은 학습에서 뺐습니다.", code: CODE.lab4, src: "노트북 5-4절",
+      res: `<div class="out">학습 완료  검증 AUC = ${fmt(D.counts.val_auc)}</div>${tableHTML(resCols, pick(["인기순 (기준선)", "콘텐츠 기반", "아이템 기반 CF", "행렬 분해 (WALS)", "투 타워"]), { best: 4 })}<p class="take"><b>결과</b> 다섯 방식 중 정확도 1위입니다. 다만 평균 유사도 0.451로 목록이 한쪽 주제에 몰리는 경향이 있습니다.</p>` },
+    { k: "LAB 5 · 서빙", h: "후보 생성 → 점수 → 재순위 파이프라인", p: "행렬 분해와 인기순 두 생성기로 후보를 모으고, 투 타워로 정렬한 뒤, 한 주제가 목록을 독차지하지 않게 재순위합니다.", code: CODE.lab5, src: "노트북 6-1절",
+      res: tableHTML(resCols, pick(["투 타워", "파이프라인 (재순위 없음)", "파이프라인 (주제당 최대 4)"])) + `<div class="out">사용자 0 (18세, 한국어, 숨은 취향: ${esc(D.user0.fav)})
+추천 10개 주제: ${(() => { const c = {}; D.user0.recs.forEach((r) => (c[r.topic] = (c[r.topic] || 0) + 1)); return Object.entries(c).map(([k, v]) => `${k} ${v}`).join(" · "); })()}</div><p class="take"><b>해석</b> 숨은 취향인 게임과 연관 주제인 음악이 4개씩 채웠고, 재순위 덕분에 코딩과 요리도 한 개씩 들어갔습니다.</p>` },
+    { k: "LAB 6 · 콜드 스타트", h: "기록 없는 사용자와 새 영상에 추천하기", p: "투 타워는 ID가 아니라 피처로 임베딩을 만들기 때문에, 시청 기록이 없는 신규 사용자나 방금 올라온 영상도 바로 추천에 쓸 수 있습니다.", code: CODE.lab6, src: "노트북 6-2절",
+      res: `<div class="out">17세·한국어·모바일 신규 사용자에게 추천된 주제: {'게임': 10}
+'게임 공략' 새 영상과 가장 잘 맞는 사용자 20명의 숨은 취향: {'게임': 14, '음악': 6}</div><p class="take"><b>해석</b> 아직 이 사람을 아는 것이 아니라 비슷한 사람들을 아는 것입니다. 시청 기록이 쌓이면 이력 피처가 채워지며 점점 개인화됩니다.</p>` }
+  ];
+  $("#labs").innerHTML = labs.map((l, i) => `
+    <article class="lab"><header><span class="k">${l.k}</span><h3>${esc(l.h)}</h3><p>${esc(l.p)}</p></header>
+      <div class="lab-body"><div class="code"><div class="code-bar"><span class="src">${esc(l.src)}</span><button class="copy" type="button" data-i="${i}">복사</button></div><pre><code>${highlight(l.code)}</code></pre></div>
+      <div class="result"><span class="label">실행 결과</span>${l.res}</div></div></article>`).join("");
+  $("#labs").querySelectorAll(".copy").forEach((b) => b.addEventListener("click", async () => {
+    const text = labs[Number(b.dataset.i)].code;
+    try { await navigator.clipboard.writeText(text); b.textContent = "복사됨"; }
+    catch (e) { const r = document.createRange(); r.selectNodeContents(b.parentElement.querySelector("pre")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = "선택됨"; }
+    setTimeout(() => (b.textContent = "복사"), 1600);
+  }));
+}
+
+/* ---------- status chips: icon + label ---------- */
+document.querySelectorAll(".chip[data-ic]").forEach((c) => {
+  const ok = c.dataset.ic === "ok";
+  c.insertAdjacentHTML("afterbegin", ok
+    ? '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.5l2.2 2.2L9.5 3.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    : '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2.2v4.6M6 9.2v.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>');
+});
+
+/* ---------- tabs + hash routing ---------- */
+const VIEWS = ["summary", "design", "lab", "data", "interview"];
+const drawers = { summary: [drawAcc, drawTrade], design: [drawLoss], lab: [], data: [drawHeat, drawHist, drawGroup], interview: [] };
+let current = null;
+function show(view) {
+  if (!VIEWS.includes(view)) view = "summary";
+  current = view;
+  VIEWS.forEach((v) => {
+    document.getElementById("p-" + v).hidden = v !== view;
+    const t = document.getElementById("tab-" + v);
+    t.setAttribute("aria-selected", v === view ? "true" : "false");
+    t.tabIndex = v === view ? 0 : -1;
+  });
+  drawers[view].forEach((f) => f());
+}
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+  const v = t.dataset.view;
+  if (location.hash !== "#" + v) location.hash = v; else show(v);
+  try { localStorage.setItem("rec-tab", v); } catch (e) {}
+}));
+document.querySelector(".tabs").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  const i = VIEWS.indexOf(current) + (e.key === "ArrowRight" ? 1 : -1);
+  const v = VIEWS[(i + VIEWS.length) % VIEWS.length];
+  location.hash = v; document.getElementById("tab-" + v).focus();
+});
+window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+buildLabs();
+let stored = null; try { stored = localStorage.getItem("rec-tab"); } catch (e) {}
+show(location.hash.slice(1) || stored || "summary");
+
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => drawers[current].forEach((f) => f()), 120); });
+const redraw = () => drawers[current].forEach((f) => f());
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw); } catch (e) {}
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(redraw);
+</script>
+</body>
+</html>
